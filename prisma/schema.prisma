@@ -1,0 +1,181 @@
+// Hawaiian Vacation Rents — data model
+// Local/dev runs on SQLite. For production (Vercel + Neon/Supabase),
+// change provider to "postgresql" and set DATABASE_URL accordingly.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         String     @default("OWNER") // OWNER | ADMIN
+  status       String     @default("ACTIVE") // ACTIVE | SUSPENDED
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  properties   Property[]
+  payments     Payment[]
+}
+
+model Property {
+  id             String    @id @default(cuid())
+  slug           String    @unique
+  title          String
+  description    String
+  island         String // oahu | maui | kauai | big-island
+  city           String // display name, e.g. "Kailua"
+  citySlug       String
+  address        String?
+  lat            Float?
+  lng            Float?
+  type           String // house | condo | villa | cottage | studio | townhouse
+  pricePerNight  Int // USD, whole dollars
+  bedrooms       Int
+  bathrooms      Float
+  maxGuests      Int
+  minNights      Int       @default(1)
+  amenities      String    @default("[]") // JSON array of amenity keys
+  licenseNumber  String? // Hawaii STR registration / license number
+  contactName    String
+  contactEmail   String
+  contactPhone   String?
+  website        String?
+  status         String    @default("DRAFT") // DRAFT | ACTIVE | EXPIRED | SUSPENDED
+  publishedAt    DateTime?
+  expiresAt      DateTime?
+  reminderSent   Boolean   @default(false)
+  tier           String    @default("BASIC") // BASIC | FEATURED | PREMIUM (lexicographic order == priority order)
+  views          Int       @default(0)
+  contactClicks  Int       @default(0)
+  searchText     String    @default("")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  ownerId        String
+  owner          User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  photos         Photo[]
+  payments       Payment[]
+  reports        Report[]
+
+  @@index([status, island])
+  @@index([status, citySlug])
+  @@index([ownerId])
+  @@index([expiresAt])
+}
+
+model Photo {
+  id         String   @id @default(cuid())
+  url        String
+  alt        String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+}
+
+model Payment {
+  id              String    @id @default(cuid())
+  kind            String // PUBLISH | RENEWAL
+  tier            String? // package bought: BASIC | FEATURED | PREMIUM
+  amountCents     Int
+  currency        String    @default("usd")
+  status          String    @default("PENDING") // PENDING | PAID | FAILED | CANCELED
+  method          String    @default("MOCK") // PAYPAL | USDT_TRC20 | MOCK
+  providerRef     String?   @unique // PayPal order ID, TRC20 tx hash, manual claim ref, or demo reference
+  payerReference  String? // manual PayPal claim: sender email / PayPal transaction ID
+  receiptEmail    String?
+  paidAt          DateTime?
+  createdAt       DateTime  @default(now())
+  userId          String?
+  user            User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  propertyId      String?
+  property        Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Report {
+  id            String    @id @default(cuid())
+  reason        String // scam | inaccurate | unavailable | inappropriate | other
+  details       String?
+  reporterEmail String?
+  status        String    @default("OPEN") // OPEN | RESOLVED | DISMISSED
+  createdAt     DateTime  @default(now())
+  resolvedAt    DateTime?
+  propertyId    String
+  property      Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model BlogPost {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  excerpt     String
+  content     String // Markdown
+  category    String // travel-guide | beaches | activities | restaurants | tips
+  coverImage  String?
+  published   Boolean  @default(true)
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category, published])
+}
+
+model Page {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  content   String // Markdown
+  updatedAt DateTime @updatedAt
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String?
+  message   String
+  status    String   @default("NEW") // NEW | HANDLED
+  createdAt DateTime @default(now())
+}
+
+model UsedTxHash {
+  txHash    String   @id // lifetime replay protection — never deleted
+  paymentId String?
+  usedAt    DateTime @default(now())
+}
+
+model TxVerifyAttempt {
+  id            String   @id @default(cuid())
+  txHash        String
+  ok            Boolean  @default(false)
+  code          String // ACCEPTED | FORMAT | RATE_LIMIT | REPLAY | EXISTENCE | NOT_SUCCESS | CONTRACT | RECIPIENT | AMOUNT | CONFIRMATIONS | RECENCY | NETWORK | PAYMENT_STATE
+  message       String
+  amountUsdt    Float?
+  fromAddress   String?
+  confirmations Int?
+  ip            String?
+  userId        String?
+  userEmail     String?
+  paymentId     String?
+  propertyTitle String?
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([ip, createdAt])
+}
