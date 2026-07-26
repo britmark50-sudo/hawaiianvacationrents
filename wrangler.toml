@@ -1,0 +1,48 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "hawaiianvacationrents"
+main = "worker/index.mjs"
+compatibility_date = "2025-03-25"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+# --- Cloudflare D1 (database) ---
+# Create with:  npx wrangler d1 create hvr-db   → paste the database_id below
+[[d1_databases]]
+binding = "DB"
+database_name = "hvr-db"
+database_id = "REPLACE_WITH_YOUR_D1_ID"
+migrations_dir = "migrations"
+
+# --- Cloudflare R2 (listing photo storage) ---
+# Create with:  npx wrangler r2 bucket create hvr-uploads
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "hvr-uploads"
+
+# --- Daily maintenance: expire listings + reminders (08:00 UTC) ---
+[triggers]
+crons = ["0 8 * * *"]
+
+# Non-secret runtime variables. Secrets (SESSION_SECRET, PAYPAL_*, TELEGRAM_*,
+# RESEND_API_KEY, CRON_SECRET…) are set with:  npx wrangler secret put NAME
+[vars]
+NEXT_PUBLIC_SITE_URL = "https://hawaiianvacationrents.com"
+PAYMENT_MODE = "live"
+LISTING_DURATION_DAYS = "30"
+BASIC_PRICE_CENTS = "500"
+FEATURED_PRICE_CENTS = "2000"
+PREMIUM_PRICE_CENTS = "5000"
+USDT_TRC20_ADDRESS = "TMj7NPGT2eq4apF4RYvmcVuLy2eMcVRG3J"
+EMAIL_FROM = "Hawaiian Vacation Rents <no-reply@hawaiianvacationrents.com>"
+FORMSPREE_ENDPOINT = "https://formspree.io/f/mbdvvkww"
+
+# --- Custom domain (uncomment after adding the domain to your Cloudflare account) ---
+# [[routes]]
+# pattern = "hawaiianvacationrents.com"
+# custom_domain = true
+# [[routes]]
+# pattern = "www.hawaiianvacationrents.com"
+# custom_domain = true
