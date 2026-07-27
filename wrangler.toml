@@ -13,7 +13,7 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "hvr-db"
-database_id = "REPLACE_WITH_YOUR_D1_ID"
+database_id = "016e9007-0c8b-4499-bb35-2ddc17c5c274"
 migrations_dir = "migrations"
 
 # --- Cloudflare R2 (listing photo storage) ---
