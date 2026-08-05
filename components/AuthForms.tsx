@@ -44,22 +44,17 @@ export function SignupForm() {
         <input id="s-email" name="email" type="email" required autoComplete="email" className="input" placeholder="you@example.com" />
       </div>
       <div>
-        <label className="label" htmlFor="s-phone">Phone (optional)</label>
-        <input id="s-phone" name="phone" autoComplete="tel" className="input" placeholder="(808) 555-0100" />
-      </div>
-      <div>
         <label className="label" htmlFor="s-password">Password</label>
         <input id="s-password" name="password" type="password" required minLength={8} autoComplete="new-password" className="input" placeholder="At least 8 characters" />
+      </div>
+      <div>
+        <label className="label" htmlFor="s-confirm-password">Confirm password</label>
+        <input id="s-confirm-password" name="confirmPassword" type="password" required autoComplete="new-password" className="input" placeholder="Re-enter your password" />
       </div>
       {state?.error && <p className="text-sm font-medium text-coral">{state.error}</p>}
       <button type="submit" disabled={pending} className="btn-primary w-full">
         {pending ? "Creating account…" : "Create account"}
       </button>
-      <p className="text-center text-xs leading-relaxed text-ink/50">
-        By creating an account you agree to our{" "}
-        <Link href="/terms-of-service" className="underline">Terms of Service</Link> and{" "}
-        <Link href="/privacy-policy" className="underline">Privacy Policy</Link>.
-      </p>
       <p className="text-center text-sm text-ink/60">
         Already have an account?{" "}
         <Link href="/login" className="font-semibold text-teal hover:underline">Log in</Link>

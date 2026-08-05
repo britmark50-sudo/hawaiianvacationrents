@@ -2,40 +2,70 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { createSession, destroySession, hashPassword, verifyPassword } from "@/lib/auth";
+import { createSession, destroySession, verifyPassword } from "@/lib/auth";
+import { hashPassword } from "@/lib/password";
 import { redirect } from "next/navigation";
 
 export type AuthState = { error?: string } | undefined;
 
-const signupSchema = z.object({
-  name: z.string().trim().min(2, "Please enter your full name."),
-  email: z.string().trim().toLowerCase().email("Please enter a valid email address."),
-  phone: z.string().trim().max(30).optional().or(z.literal("")),
-  password: z.string().min(8, "Password must be at least 8 characters."),
-});
+const signupSchema = z
+  .object({
+    name: z.string().trim().min(2, "Please enter your full name."),
+    email: z.string().trim().toLowerCase().email("Please enter a valid email address."),
+    password: z.string().min(8, "Password must be at least 8 characters."),
+    confirmPassword: z.string().min(1, "Please confirm your password."),
+  })
+  .superRefine(({ password, confirmPassword }, ctx) => {
+    if (password !== confirmPassword) {
+      ctx.addIssue({ code: "custom", message: "Passwords do not match.", path: ["confirmPassword"] });
+    }
+  });
 
 export async function signup(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const parsed = signupSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
-    phone: formData.get("phone"),
     password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message || "Please check the form." };
   }
-  const { name, email, phone, password } = parsed.data;
+  const { name, email, password } = parsed.data;
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return { error: "An account with this email already exists. Try logging in instead." };
+  try {
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return { error: "An account with this email already exists. Try logging in instead." };
+    }
+
+    const user = await prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          name,
+          email,
+          passwordHash: await hashPassword(password),
+          role: "OWNER",
+          status: "ACTIVE",
+        },
+      });
+      await tx.ownerProfile.create({
+        data: { userId: createdUser.id },
+      });
+      return createdUser;
+    });
+
+    await createSession({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    });
+  } catch {
+    return { error: "We couldn't create your account. Please try again." };
   }
 
-  const user = await prisma.user.create({
-    data: { name, email, phone: phone || null, passwordHash: await hashPassword(password) },
-  });
-  await createSession(user);
-  redirect("/dashboard?welcome=1");
+  redirect("/dashboard/new");
 }
 
 const loginSchema = z.object({
