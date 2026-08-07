@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getCfEnv } from "@/lib/cf";
-import crypto from "crypto";
-import path from "path";
 
-export const runtime = "nodejs";
 
 const MAX_SIZE = 8 * 1024 * 1024; // 8MB
 const EXT: Record<string, string> = {
@@ -33,7 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Image must be smaller than 8MB" }, { status: 400 });
   }
 
-  const name = crypto.randomUUID() + ext;
+  const name = (globalThis.crypto?.randomUUID?.() || `upload-${Date.now()}-${Math.random().toString(16).slice(2)}`) + ext;
   const bytes = await file.arrayBuffer();
 
   // Cloudflare: store in R2
@@ -46,10 +43,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: `/r2/${key}` });
   }
 
-  // Local development: write to public/uploads
-  const { mkdir, writeFile } = await import("fs/promises");
-  const dir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, name), Buffer.from(bytes));
-  return NextResponse.json({ url: `/uploads/${name}` });
+  // Local development fallback: only available when running in a Node environment.
+  if (typeof process !== "undefined" && process.versions?.node) {
+    const path = await import("node:path");
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    const dir = path.join(process.cwd(), "public", "uploads");
+    await mkdir(dir, { recursive: true });
+    await writeFile(path.join(dir, name), Buffer.from(bytes));
+    return NextResponse.json({ url: `/uploads/${name}` });
+  }
+
+  return NextResponse.json({ error: "Upload storage is not configured in this environment." }, { status: 500 });
 }

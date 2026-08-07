@@ -1,5 +1,14 @@
 import "server-only";
-import crypto from "crypto";
+
+async function sha256Bytes(data: Uint8Array): Promise<Uint8Array> {
+  const bytes = Uint8Array.from(data);
+  const digest = await crypto.subtle.digest("SHA-256", bytes as BufferSource);
+  return new Uint8Array(digest);
+}
+
+function asHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
 /** Official Tether USDT contract on the TRON network (TRC20). */
 export const USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
@@ -51,7 +60,7 @@ export function isValidTxHashFormat(hash: string): boolean {
 const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 /** Decodes a base58check TRON address to its 21-byte hex form (41 + 20 bytes). Throws on invalid input. */
-export function tronAddressToHex(address: string): string {
+export async function tronAddressToHex(address: string): Promise<string> {
   let num = 0n;
   for (const ch of address) {
     const idx = B58.indexOf(ch);
@@ -60,7 +69,6 @@ export function tronAddressToHex(address: string): string {
   }
   let hex = num.toString(16);
   if (hex.length % 2) hex = "0" + hex;
-  // leading '1's encode leading zero bytes
   let leading = 0;
   for (const ch of address) {
     if (ch === "1") leading++;
@@ -70,13 +78,13 @@ export function tronAddressToHex(address: string): string {
   if (bytes.length !== 25) throw new Error("Invalid address length");
   const payload = bytes.subarray(0, 21);
   const checksum = bytes.subarray(21);
-  const digest = crypto
-    .createHash("sha256")
-    .update(crypto.createHash("sha256").update(payload).digest())
-    .digest()
-    .subarray(0, 4);
-  if (!digest.equals(checksum)) throw new Error("Invalid address checksum");
-  return payload.toString("hex");
+  const firstHash = await sha256Bytes(payload);
+  const secondHash = await sha256Bytes(firstHash);
+  const digest = secondHash.subarray(0, 4);
+  if (!Buffer.from(digest).equals(Buffer.from(checksum))) {
+    throw new Error("Invalid address checksum");
+  }
+  return asHex(new Uint8Array(payload));
 }
 
 async function fetchJson(url: string, init: RequestInit = {}, timeoutMs = 10000): Promise<unknown> {
@@ -230,7 +238,7 @@ async function verifyViaTronGrid(
 
   const contract = tx.raw_data?.contract?.[0];
   const value = contract?.parameter?.value || {};
-  const usdtHex = tronAddressToHex(USDT_CONTRACT);
+  const usdtHex = await tronAddressToHex(USDT_CONTRACT);
   if (contract?.type !== "TriggerSmartContract" || (value.contract_address || "").toLowerCase() !== usdtHex) {
     return fail(
       "CONTRACT",
@@ -245,7 +253,7 @@ async function verifyViaTronGrid(
   }
   const toHex = "41" + dataHex.slice(8 + 24, 8 + 64);
   const amountRaw = BigInt("0x" + dataHex.slice(8 + 64, 8 + 128));
-  const expectedHex = tronAddressToHex(expectedTo);
+  const expectedHex = await tronAddressToHex(expectedTo);
   if (toHex !== expectedHex) {
     return fail("RECIPIENT", "This USDT transfer was not sent to our payment address. Check the address and TxID.");
   }

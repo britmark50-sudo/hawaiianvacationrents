@@ -4,8 +4,6 @@ import { capturePayPalOrder } from "@/lib/paypal";
 import { fulfillPayment } from "@/lib/billing";
 import { SITE_URL } from "@/lib/constants";
 
-export const runtime = "nodejs";
-
 export async function GET(req: NextRequest) {
   const orderId = req.nextUrl.searchParams.get("token");
   if (!orderId) {

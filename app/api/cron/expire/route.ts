@@ -5,8 +5,6 @@ import { SITE_URL } from "@/lib/constants";
 import { formatDate } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
 
-export const runtime = "nodejs";
-
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (secret) {
