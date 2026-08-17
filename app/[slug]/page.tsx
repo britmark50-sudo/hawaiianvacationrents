@@ -6,8 +6,8 @@ import { PropertyCard } from "@/components/PropertyCard";
 
 export const revalidate = 600;
 
-export default async function IslandPage({ params }: { params: { slug: string } }) {
-  const { slug } = params;
+export default async function IslandPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
   const island = islandBySlug(slug);
   if (!island) return notFound();
 
